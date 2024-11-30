@@ -28,9 +28,7 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: |
-            ghcr.io/untitledds/taiga-back
-          flavor: |
-            suffix=-access
+            ghcr.io/untitledds/taiga-back-access
           tags: |
             type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
             type=semver,pattern={{raw}},enable=${{ github.ref_type == 'tag' }}
@@ -51,7 +49,7 @@ jobs:
       - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
-          file: Dockerfile
+          file: Dockerfile.back
           push: true
           tags: ${{ steps.meta-back.outputs.tags }}
           platforms: linux/amd64
