@@ -10,14 +10,28 @@ from .connector import get_user_info
 
 logger = logging.getLogger(__name__)
 
-USER_KEY = getattr(settings, "ACCESS_TOKEN_USER_KEY", "access_token_auth")
+USER_KEY = settings.ACCESS_TOKEN_USER_KEY
+
+# Сопоставление проектов
+PROJECTS = {}
+projects_str = os.getenv("PROJECTS", "")
+for project in projects_str.split(","):
+    name, id = project.split(":")
+    PROJECTS[name] = id
+
+# Сопоставление групп и проектов
+GROUP_PROJECT_MAPPING = {}
+groups_str = os.getenv("GROUPS", "")
+for group in groups_str.split(","):
+    name, project = group.split(":")
+    GROUP_PROJECT_MAPPING[name] = project
 
 def determine_role(groups):
     if settings.GROUPS["OWNER"] in groups:
         return settings.ROLES["OWNER"]
     elif settings.GROUPS["ADMIN"] in groups:
         return settings.ROLES["ADMIN"]
-    return settings.ROLES["MEMBER"]
+    return settings.ROLES[settings.DEFAULT_ROLE]
 
 @tx.atomic
 def access_token_register(
@@ -64,7 +78,7 @@ def access_token_register(
         user.groups.set([settings.GROUPS["WATCHERS"]])
         logger.info(f"Default group 'Watchers' assigned to user: {email}")
 
-    default_role = determine_role(groups) if groups else settings.ROLES["MEMBER"]
+    default_role = determine_role(groups) if groups else settings.ROLES[settings.DEFAULT_ROLE]
     membership_model.objects.create(user=user, role=default_role, project_id=project_id)
     logger.info(f"Role assigned to user: {email}, role: {default_role}, project_id: {project_id}")
 
@@ -77,14 +91,11 @@ def access_token_login_func(request):
         groups = user_info.get('groups', [])
 
         # Определение project_id на основе групп
-        if settings.GROUPS["SECURITY_ADMINS"] in groups or settings.GROUPS["SECURITY_ANALYSTS"] in groups or settings.GROUPS["WATCHERS"] in groups:
-            project_id = settings.PROJECTS["SECURITY"]
-        elif settings.GROUPS["CVE_ADMINS"] in groups or settings.GROUPS["CVE_RESEARCHERS"] in groups or settings.GROUPS["CVE_WATCHERS"] in groups:
-            project_id = settings.PROJECTS["CVE"]
-        elif settings.GROUPS["PROJECT_ADMINS"] in groups or settings.GROUPS["DEVELOPERS"] in groups or settings.GROUPS["VENDOR_SUPPORT"] in groups:
-            project_id = settings.PROJECTS["VENDOR"]
-        else:
-            project_id = None
+        project_id = None
+        for group in groups:
+            if group in GROUP_PROJECT_MAPPING:
+                project_id = PROJECTS[GROUP_PROJECT_MAPPING[group]]
+                break
 
         user = access_token_register(
             username=user_info['username'],
