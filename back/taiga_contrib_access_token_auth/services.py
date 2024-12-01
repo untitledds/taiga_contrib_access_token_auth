@@ -28,6 +28,7 @@ def access_token_register(
         oidc_guid: str,
         groups: list = None,
         token: str=None,
+        project_id: str=None,
 ):
     logger.info(f"Starting registration process for user: {email}")
     auth_data_model = apps.get_model("users", "AuthData")
@@ -62,8 +63,8 @@ def access_token_register(
         logger.info(f"Groups assigned to user: {email}, groups: {groups}")
 
     default_role = determine_role(groups)
-    membership_model.objects.create(user=user, role=default_role)
-    logger.info(f"Role assigned to user: {email}, role: {default_role}")
+    membership_model.objects.create(user=user, role=default_role, project_id=project_id)
+    logger.info(f"Role assigned to user: {email}, role: {default_role}, project_id: {project_id}")
 
     return user
 
@@ -73,12 +74,23 @@ def access_token_login_func(request):
         user_info = get_user_info(access_token)
         groups = user_info.get('groups', [])
 
+        # Определение project_id на основе групп
+        if settings.GROUPS["SECURITY_ADMINS"] in groups or settings.GROUPS["SECURITY_ANALYSTS"] in groups or settings.GROUPS["WATCHERS"] in groups:
+            project_id = settings.PROJECTS["SECURITY"]
+        elif settings.GROUPS["CVE_ADMINS"] in groups or settings.GROUPS["CVE_RESEARCHERS"] in groups or settings.GROUPS["CVE_WATCHERS"] in groups:
+            project_id = settings.PROJECTS["CVE"]
+        elif settings.GROUPS["PROJECT_ADMINS"] in groups or settings.GROUPS["DEVELOPERS"] in groups or settings.GROUPS["VENDOR_SUPPORT"] in groups:
+            project_id = settings.PROJECTS["VENDOR"]
+        else:
+            project_id = None
+
         user = access_token_register(
             username=user_info['username'],
             email=user_info['email'],
             full_name=user_info['full_name'],
             oidc_guid=user_info['guid'],
             groups=groups,
+            project_id=project_id,
         )
         data = make_auth_response_data(user)
         return data
