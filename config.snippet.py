@@ -21,6 +21,9 @@ if USE_FORWARDED_HOST:
     USE_X_FORWARDED_HOST = USE_FORWARDED_HOST
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
+# Константы для аутентификации
+ACCESS_TOKEN_USER_KEY = os.getenv("ACCESS_TOKEN_USER_KEY", "access_token_auth")
+
 # Константы для ролей
 ROLES = {
     "OWNER": os.getenv("ROLE_OWNER", "Owner"),
@@ -29,22 +32,11 @@ ROLES = {
     "WATCHER": os.getenv("ROLE_WATCHER", "Watcher"),
 }
 
-# Константы для групп
-GROUPS = {
-    "SECURITY_ADMINS": os.getenv("GROUP_SECURITY_ADMINS", "Security Admins"),
-    "SECURITY_ANALYSTS": os.getenv("GROUP_SECURITY_ANALYSTS", "Security Analysts"),
-    "WATCHERS": os.getenv("GROUP_WATCHERS", "Watchers"),
-    "CVE_ADMINS": os.getenv("GROUP_CVE_ADMINS", "CVE Admins"),
-    "CVE_RESEARCHERS": os.getenv("GROUP_CVE_RESEARCHERS", "CVE Researchers"),
-    "CVE_WATCHERS": os.getenv("GROUP_CVE_WATCHERS", "CVE Watchers"),
-    "PROJECT_ADMINS": os.getenv("GROUP_PROJECT_ADMINS", "Project Admins"),
-    "DEVELOPERS": os.getenv("GROUP_DEVELOPERS", "Developers"),
-    "VENDOR_SUPPORT": os.getenv("GROUP_VENDOR_SUPPORT", "Vendor Support"),
-}
-
-# Константы для проектов
-PROJECTS = {
-    "SECURITY": os.getenv("PROJECT_ID_SECURITY", "1"),
-    "CVE": os.getenv("PROJECT_ID_CVE", "2"),
-    "VENDOR": os.getenv("PROJECT_ID_VENDOR", "3"),
+# Поля пользователя
+USER_FIELDS = {
+    "GUID": os.getenv("USER_FIELD_GUID", "sub"),
+    "USERNAME": os.getenv("USER_FIELD_USERNAME", "preferred_username"),
+    "EMAIL": os.getenv("USER_FIELD_EMAIL", "email"),
+    "FULL_NAME": os.getenv("USER_FIELD_FULL_NAME", "name"),
+    "GROUPS": os.getenv("USER_FIELD_GROUPS", "groups"),
 }
