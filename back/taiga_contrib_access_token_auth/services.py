@@ -1,5 +1,4 @@
 import logging
-import os
 from django.db import transaction as tx
 from django.apps import apps
 from django.conf import settings
@@ -61,8 +60,11 @@ def access_token_register(
     if groups:
         user.groups.set(groups)
         logger.info(f"Groups assigned to user: {email}, groups: {groups}")
+    else:
+        user.groups.set([settings.GROUPS["WATCHERS"]])
+        logger.info(f"Default group 'Watchers' assigned to user: {email}")
 
-    default_role = determine_role(groups)
+    default_role = determine_role(groups) if groups else settings.ROLES["MEMBER"]
     membership_model.objects.create(user=user, role=default_role, project_id=project_id)
     logger.info(f"Role assigned to user: {email}, role: {default_role}, project_id: {project_id}")
 
