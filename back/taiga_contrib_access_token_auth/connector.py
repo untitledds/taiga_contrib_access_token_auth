@@ -30,7 +30,7 @@ def get_user_info(access_token):
     user_info = userinfo_response.json()
 
     # Проверка обязательных полей
-    required_fields = ['sub', 'preferred_username', 'email', 'name']
+    required_fields = [settings.USER_FIELDS["GUID"], settings.USER_FIELDS["USERNAME"], settings.USER_FIELDS["EMAIL"], settings.USER_FIELDS["FULL_NAME"]]
     for field in required_fields:
         if field not in user_info:
             logger.error(f"Missing required field '{field}' in user info response")
@@ -41,9 +41,9 @@ def get_user_info(access_token):
 
     # Возвращаем информацию о пользователе
     return {
-        'guid': user_info['sub'],
-        'username': user_info['preferred_username'],
-        'email': user_info['email'],
-        'full_name': user_info['name'],
-        'groups': user_info.get('groups', []),
+        'guid': user_info[settings.USER_FIELDS["GUID"]],
+        'username': user_info[settings.USER_FIELDS["USERNAME"]],
+        'email': user_info[settings.USER_FIELDS["EMAIL"]],
+        'full_name': user_info[settings.USER_FIELDS["FULL_NAME"]],
+        'groups': user_info.get(settings.USER_FIELDS["GROUPS"], []),
     }
