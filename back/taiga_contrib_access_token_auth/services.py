@@ -12,6 +12,7 @@ from .connector import get_user_info
 logger = logging.getLogger(__name__)
 
 USER_KEY = settings.ACCESS_TOKEN_USER_KEY
+FILTER_GROUPS = os.getenv("FILTER_GROUPS", "False").lower() == "true"
 
 # Сопоставление проектов
 PROJECTS = {}
@@ -41,13 +42,13 @@ def access_token_register(
         full_name: str,
         oidc_guid: str,
         groups: list = None,
-        token: str=None,
-        project_id: str=None,
 ):
     logger.info(f"Starting registration process for user: {email}")
     auth_data_model = apps.get_model("users", "AuthData")
     user_model = apps.get_model("users", "User")
     membership_model = apps.get_model("projects", "Membership")
+    role_model = apps.get_model("projects", "Role")
+    project_model = apps.get_model("projects", "Project")
 
     try:
         auth_data = auth_data_model.objects.get(key=USER_KEY, value=oidc_guid)
@@ -66,22 +67,38 @@ def access_token_register(
             user_registered_signal.send(sender=user.__class__, user=user)
             logger.info(f"New user created: {email}")
 
-    if token:
-        membership = get_membership_by_token(token)
-        membership.user = user
-        membership.save(update_fields=["user"])
-        logger.info(f"Membership updated for user: {email}")
-
-    if groups:
-        user.groups.set(groups)
-        logger.info(f"Groups assigned to user: {email}, groups: {groups}")
-    else:
-        user.groups.set([settings.GROUPS["WATCHERS"]])
-        logger.info(f"Default group 'Watchers' assigned to user: {email}")
+    # Определение project_id на основе групп
+    project_id = None
+    for group in groups:
+        if group in GROUP_PROJECT_MAPPING:
+            project_id = PROJECTS[GROUP_PROJECT_MAPPING[group]]
+            break
 
     default_role = determine_role(groups) if groups else settings.ROLES[settings.DEFAULT_ROLE]
-    membership_model.objects.create(user=user, role=default_role, project_id=project_id)
-    logger.info(f"Role assigned to user: {email}, role: {default_role}, project_id: {project_id}")
+
+    if FILTER_GROUPS and not groups:
+        raise ConnectorBaseException({
+            "error_message": "Access denied",
+            "details": "Required groups not found"
+        })
+
+    if project_id:
+        project = project_model.objects.get(id=project_id)
+    else:
+        project_id = settings.DEFAULT_PROJECT_ID
+        project = project_model.objects.get(id=project_id)
+
+    role, _ = role_model.objects.get_or_create(
+        project=project,
+        name=default_role
+    )
+
+    membership_model.objects.get_or_create(
+        user=user,
+        project=project,
+        role=role
+    )
+    logger.info(f"Role assigned to user: {email}, role: {default_role}, project_id: {project.id}")
 
     return user
 
@@ -91,20 +108,12 @@ def access_token_login_func(request):
         user_info = get_user_info(access_token)
         groups = user_info.get('groups', [])
 
-        # Определение project_id на основе групп
-        project_id = None
-        for group in groups:
-            if group in GROUP_PROJECT_MAPPING:
-                project_id = PROJECTS[GROUP_PROJECT_MAPPING[group]]
-                break
-
         user = access_token_register(
             username=user_info['username'],
             email=user_info['email'],
             full_name=user_info['full_name'],
             oidc_guid=user_info['guid'],
             groups=groups,
-            project_id=project_id,
         )
         data = make_auth_response_data(user)
         return data
