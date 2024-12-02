@@ -37,7 +37,7 @@ def access_token_register(
     auth_data_model = apps.get_model("users", "AuthData")
     user_model = apps.get_model("users", "User")
     membership_model = apps.get_model("projects", "Membership")
-    role_model = apps.get_model("projects", "Role")
+    role_model = apps.get_model("users", "Role")  # Исправлено: указываем правильное приложение
     project_model = apps.get_model("projects", "Project")
 
     try:
