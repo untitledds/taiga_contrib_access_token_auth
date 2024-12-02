@@ -29,6 +29,24 @@ def determine_role_and_project(groups):
                 return role.upper(), PROJECTS[project.upper()]
     return None, None
 
+def assign_role_and_update_admin_status(user, role, project_key, project_model, role_model, membership_model):
+    """
+    Назначает роль пользователю и обновляет статус администратора, если это необходимо.
+    """
+    if role.upper() == ADMIN_GROUP.upper() and project_key.upper() in PROJECTS:
+        project_id = PROJECTS[project_key.upper()]
+        project = project_model.objects.get(id=project_id)
+        role, _ = role_model.objects.get_or_create(project=project, name=role)
+        membership, created = membership_model.objects.get_or_create(
+            user=user,
+            project=project,
+            defaults={'role': role, 'is_admin': True}
+        )
+        if not created and not membership.is_admin:
+            membership.is_admin = True
+            membership.save()
+        logger.info(f"Admin role assigned to user: {user.email}, project_id: {project.id}")
+
 @tx.atomic
 def access_token_register(
         username: str,
@@ -61,6 +79,11 @@ def access_token_register(
             user_registered_signal.send(sender=user.__class__, user=user)
             logger.info(f"New user created: {email}")
 
+    # Проверка на наличие группы администраторов и обновление статуса администратора
+    for group in groups:
+        role, project_key = group.split(':')
+        assign_role_and_update_admin_status(user, role, project_key, project_model, role_model, membership_model)
+
     role, project_id = determine_role_and_project(groups) if groups else (None, None)
 
     if FILTER_GROUPS and not role:
@@ -80,21 +103,12 @@ def access_token_register(
         name=role
     )
 
-    # Проверка на наличие группы администраторов
-    is_admin = ADMIN_GROUP in groups
-
-    membership, created = membership_model.objects.get_or_create(
+    membership_model.objects.get_or_create(
         user=user,
         project=project,
-        defaults={'role': role, 'is_admin': is_admin}
+        role=role
     )
-
-    # Обновление статуса администратора, если пользователь ранее не был админом
-    if not created and is_admin and not membership.is_admin:
-        membership.is_admin = True
-        membership.save()
-
-    logger.info(f"Role assigned to user: {email}, role: {role}, project_id: {project.id}, is_admin: {is_admin}")
+    logger.info(f"Role assigned to user: {email}, role: {role}, project_id: {project.id}")
 
     return user
 
