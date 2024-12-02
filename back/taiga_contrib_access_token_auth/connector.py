@@ -12,7 +12,7 @@ def get_user_info(access_token):
     :param access_token: Токен доступа от OIDC-провайдера.
     :returns: Информация о пользователе.
     """
-    userinfo_url = settings.OIDC_USERINFO_ENDPOINT
+    userinfo_url = settings.OIDC_OP_USER_ENDPOINT
 
     try:
         userinfo_response = requests.get(
