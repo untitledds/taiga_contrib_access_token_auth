@@ -15,8 +15,12 @@ USER_KEY = settings.ACCESS_TOKEN_USER_KEY
 FILTER_GROUPS = settings.FILTER_GROUPS
 PROJECTS = settings.PROJECTS
 DEFAULT_ROLE = settings.DEFAULT_ROLE
+ADMIN_GROUP = settings.ADMIN_GROUP  # Добавляем переменную окружения для группы администраторов
 
 def determine_role_and_project(groups):
+    """
+    Определяет роль и проект на основе групп пользователя.
+    """
     for group in groups:
         parts = group.split(':')
         if len(parts) == 2:
@@ -76,12 +80,21 @@ def access_token_register(
         name=role
     )
 
-    membership_model.objects.get_or_create(
+    # Проверка на наличие группы администраторов
+    is_admin = ADMIN_GROUP in groups
+
+    membership, created = membership_model.objects.get_or_create(
         user=user,
         project=project,
-        role=role
+        defaults={'role': role, 'is_admin': is_admin}
     )
-    logger.info(f"Role assigned to user: {email}, role: {role}, project_id: {project.id}")
+
+    # Обновление статуса администратора, если пользователь ранее не был админом
+    if not created and is_admin and not membership.is_admin:
+        membership.is_admin = True
+        membership.save()
+
+    logger.info(f"Role assigned to user: {email}, role: {role}, project_id: {project.id}, is_admin: {is_admin}")
 
     return user
 
