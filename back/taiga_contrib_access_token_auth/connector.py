@@ -27,10 +27,22 @@ def get_user_info(access_token):
             "details": str(e)
         })
 
-    user_info = userinfo_response.json()
+    try:
+        user_info = userinfo_response.json()
+    except ValueError as e:
+        logger.error(f"Failed to parse JSON response: {e}")
+        raise ConnectorBaseException({
+            "error_message": "Failed to parse JSON response",
+            "details": str(e)
+        })
 
     # Проверка обязательных полей
-    required_fields = [settings.USER_FIELDS["GUID"], settings.USER_FIELDS["USERNAME"], settings.USER_FIELDS["EMAIL"], settings.USER_FIELDS["FULL_NAME"]]
+    required_fields = [
+        settings.USER_FIELDS["GUID"],
+        settings.USER_FIELDS["USERNAME"],
+        settings.USER_FIELDS["EMAIL"],
+        settings.USER_FIELDS["FULL_NAME"]
+    ]
     for field in required_fields:
         if field not in user_info:
             logger.error(f"Missing required field '{field}' in user info response")
