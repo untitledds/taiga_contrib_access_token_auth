@@ -15,18 +15,18 @@ logger = logging.getLogger(__name__)
 USER_KEY = settings.ACCESS_TOKEN_USER_KEY
 FILTER_GROUPS = settings.FILTER_GROUPS
 PROJECTS = settings.PROJECTS
-GROUP_PROJECT_MAPPING = settings.GROUP_PROJECT_MAPPING
 DEFAULT_ROLE = settings.DEFAULT_ROLE
 
-def determine_role(groups):
-    role_pattern = re.compile(r'^.*_(.*)$')
+def determine_role_and_project(groups):
+    role_project_pattern = re.compile(r'^(.*):(.*)$')
     for group in groups:
-        match = role_pattern.match(group)
+        match = role_project_pattern.match(group)
         if match:
             role = match.group(1).upper()
-            if role in settings.ROLES:
-                return settings.ROLES[role]
-    return settings.ROLES[DEFAULT_ROLE]
+            project = match.group(2).upper()
+            if project in PROJECTS:
+                return role, PROJECTS[project]
+    return DEFAULT_ROLE, settings.DEFAULT_PROJECT_ID
 
 @tx.atomic
 def access_token_register(
@@ -60,14 +60,7 @@ def access_token_register(
             user_registered_signal.send(sender=user.__class__, user=user)
             logger.info(f"New user created: {email}")
 
-    # Определение project_id на основе групп
-    project_id = None
-    for group in groups:
-        if group in GROUP_PROJECT_MAPPING:
-            project_id = PROJECTS[GROUP_PROJECT_MAPPING[group]]
-            break
-
-    default_role = determine_role(groups) if groups else settings.ROLES[DEFAULT_ROLE]
+    default_role, project_id = determine_role_and_project(groups) if groups else (DEFAULT_ROLE, settings.DEFAULT_PROJECT_ID)
 
     if FILTER_GROUPS and not groups:
         raise ConnectorBaseException({
@@ -75,11 +68,7 @@ def access_token_register(
             "details": "Required groups not found"
         })
 
-    if project_id:
-        project = project_model.objects.get(id=project_id)
-    else:
-        project_id = settings.DEFAULT_PROJECT_ID
-        project = project_model.objects.get(id=project_id)
+    project = project_model.objects.get(id=project_id)
 
     role, _ = role_model.objects.get_or_create(
         project=project,
