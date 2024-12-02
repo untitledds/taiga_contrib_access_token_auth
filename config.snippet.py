@@ -48,3 +48,4 @@ DEFAULT_PROJECT_ID = os.getenv("DEFAULT_PROJECT_ID", "default_project_id")
 
 # Настройка для роли по умолчанию
 DEFAULT_ROLE = os.getenv("DEFAULT_ROLE", "Member")
+ADMIN_GROUP = os.getenv("ADMIN_GROUP", "Admin")
