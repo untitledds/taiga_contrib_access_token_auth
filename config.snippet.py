@@ -40,3 +40,8 @@ USER_FIELDS = {
     "FULL_NAME": os.getenv("USER_FIELD_FULL_NAME", "name"),
     "GROUPS": os.getenv("USER_FIELD_GROUPS", "groups"),
 }
+# Настройка для фильтрации групп
+FILTER_GROUPS = os.getenv("FILTER_GROUPS", "False").lower() == "true"
+
+# Настройка для проекта по умолчанию
+DEFAULT_PROJECT_ID = os.getenv("DEFAULT_PROJECT_ID", "default_project_id")
