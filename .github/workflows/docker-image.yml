@@ -1,0 +1,78 @@
+name: Docker Image CI
+
+on:
+  push:
+    branches:
+      - dev
+      - master
+    tags:
+      - "*.*.*"
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  build:
+    name: Build and Push Docker images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Docker meta backend image
+        id: meta-back
+        uses: docker/metadata-action@v5
+        with:
+          images: |
+            ghcr.io/untitledds/taiga-back-access
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
+            type=semver,pattern={{raw}},enable=${{ github.ref_type == 'tag' }}
+            type=ref,event=pr
+            type=ref,event=branch,enable=${{ github.ref_name == 'dev' }},value=dev
+            type=ref,event=branch,enable=${{ github.ref_name == 'master' }},value=latest
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta-back.outputs.tags }}
+          platforms: linux/amd64
+
+      - name: Cache Docker layers
+        uses: actions/cache@v3
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+
+      - name: Build and push backend image with cache
+        uses: docker/build-push-action@v5
+        with:
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta-back.outputs.tags }}
+          platforms: linux/amd64
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache-new
+
+      - name: Move cache
+        run: |
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
