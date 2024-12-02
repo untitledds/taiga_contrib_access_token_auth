@@ -24,26 +24,12 @@ if USE_FORWARDED_HOST:
 # Константы для аутентификации
 ACCESS_TOKEN_USER_KEY = os.getenv("ACCESS_TOKEN_USER_KEY", "access_token_auth")
 
-# Роли
-ROLES = {}
-roles_str = os.getenv("ROLES", "")
-for role in roles_str.split(","):
-    key, value = role.split(":")
-    ROLES[key] = value
-
 # Проекты
 PROJECTS = {}
 projects_str = os.getenv("PROJECTS", "")
 for project in projects_str.split(","):
     name, id = project.split(":")
     PROJECTS[name] = id
-
-# Группы
-GROUP_PROJECT_MAPPING = {}
-groups_str = os.getenv("GROUPS", "")
-for group in groups_str.split(","):
-    name, project = group.split(":")
-    GROUP_PROJECT_MAPPING[name] = project
 
 # Поля пользователя
 USER_FIELDS = {
