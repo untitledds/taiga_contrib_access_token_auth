@@ -24,13 +24,26 @@ if USE_FORWARDED_HOST:
 # Константы для аутентификации
 ACCESS_TOKEN_USER_KEY = os.getenv("ACCESS_TOKEN_USER_KEY", "access_token_auth")
 
-# Константы для ролей
-ROLES = {
-    "OWNER": os.getenv("ROLE_OWNER", "Owner"),
-    "ADMIN": os.getenv("ROLE_ADMIN", "Admin"),
-    "MEMBER": os.getenv("ROLE_MEMBER", "Member"),
-    "WATCHER": os.getenv("ROLE_WATCHER", "Watcher"),
-}
+# Роли
+ROLES = {}
+roles_str = os.getenv("ROLES", "")
+for role in roles_str.split(","):
+    key, value = role.split(":")
+    ROLES[key] = value
+
+# Проекты
+PROJECTS = {}
+projects_str = os.getenv("PROJECTS", "")
+for project in projects_str.split(","):
+    name, id = project.split(":")
+    PROJECTS[name] = id
+
+# Группы
+GROUP_PROJECT_MAPPING = {}
+groups_str = os.getenv("GROUPS", "")
+for group in groups_str.split(","):
+    name, project = group.split(":")
+    GROUP_PROJECT_MAPPING[name] = project
 
 # Поля пользователя
 USER_FIELDS = {
@@ -40,8 +53,12 @@ USER_FIELDS = {
     "FULL_NAME": os.getenv("USER_FIELD_FULL_NAME", "name"),
     "GROUPS": os.getenv("USER_FIELD_GROUPS", "groups"),
 }
+
 # Настройка для фильтрации групп
 FILTER_GROUPS = os.getenv("FILTER_GROUPS", "False").lower() == "true"
 
 # Настройка для проекта по умолчанию
 DEFAULT_PROJECT_ID = os.getenv("DEFAULT_PROJECT_ID", "default_project_id")
+
+# Настройка для роли по умолчанию
+DEFAULT_ROLE = os.getenv("DEFAULT_ROLE", "Member")
