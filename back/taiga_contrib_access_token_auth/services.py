@@ -1,5 +1,6 @@
 import os
 import logging
+import re
 from django.db import transaction as tx
 from django.apps import apps
 from django.conf import settings
@@ -12,28 +13,20 @@ from .connector import get_user_info
 logger = logging.getLogger(__name__)
 
 USER_KEY = settings.ACCESS_TOKEN_USER_KEY
-FILTER_GROUPS = os.getenv("FILTER_GROUPS", "False").lower() == "true"
-
-# Сопоставление проектов
-PROJECTS = {}
-projects_str = os.getenv("PROJECTS", "")
-for project in projects_str.split(","):
-    name, id = project.split(":")
-    PROJECTS[name] = id
-
-# Сопоставление групп и проектов
-GROUP_PROJECT_MAPPING = {}
-groups_str = os.getenv("GROUPS", "")
-for group in groups_str.split(","):
-    name, project = group.split(":")
-    GROUP_PROJECT_MAPPING[name] = project
+FILTER_GROUPS = settings.FILTER_GROUPS
+PROJECTS = settings.PROJECTS
+GROUP_PROJECT_MAPPING = settings.GROUP_PROJECT_MAPPING
+DEFAULT_ROLE = settings.DEFAULT_ROLE
 
 def determine_role(groups):
-    if settings.GROUPS["OWNER"] in groups:
-        return settings.ROLES["OWNER"]
-    elif settings.GROUPS["ADMIN"] in groups:
-        return settings.ROLES["ADMIN"]
-    return settings.ROLES[settings.DEFAULT_ROLE]
+    role_pattern = re.compile(r'^.*_(.*)$')
+    for group in groups:
+        match = role_pattern.match(group)
+        if match:
+            role = match.group(1).upper()
+            if role in settings.ROLES:
+                return settings.ROLES[role]
+    return settings.ROLES[DEFAULT_ROLE]
 
 @tx.atomic
 def access_token_register(
@@ -74,7 +67,7 @@ def access_token_register(
             project_id = PROJECTS[GROUP_PROJECT_MAPPING[group]]
             break
 
-    default_role = determine_role(groups) if groups else settings.ROLES[settings.DEFAULT_ROLE]
+    default_role = determine_role(groups) if groups else settings.ROLES[DEFAULT_ROLE]
 
     if FILTER_GROUPS and not groups:
         raise ConnectorBaseException({
