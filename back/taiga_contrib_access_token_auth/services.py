@@ -26,7 +26,7 @@ def determine_role_and_project(groups):
             project = match.group(2).upper()
             if project in PROJECTS:
                 return role, PROJECTS[project]
-    return DEFAULT_ROLE, settings.DEFAULT_PROJECT_ID
+    return None, None
 
 @tx.atomic
 def access_token_register(
@@ -60,19 +60,23 @@ def access_token_register(
             user_registered_signal.send(sender=user.__class__, user=user)
             logger.info(f"New user created: {email}")
 
-    default_role, project_id = determine_role_and_project(groups) if groups else (DEFAULT_ROLE, settings.DEFAULT_PROJECT_ID)
+    role, project_id = determine_role_and_project(groups) if groups else (None, None)
 
-    if FILTER_GROUPS and not groups:
+    if FILTER_GROUPS and not role:
         raise ConnectorBaseException({
             "error_message": "Access denied",
             "details": "Required groups not found"
         })
 
+    if not role:
+        role = DEFAULT_ROLE
+        project_id = settings.DEFAULT_PROJECT_ID
+
     project = project_model.objects.get(id=project_id)
 
     role, _ = role_model.objects.get_or_create(
         project=project,
-        name=default_role
+        name=role
     )
 
     membership_model.objects.get_or_create(
@@ -80,7 +84,7 @@ def access_token_register(
         project=project,
         role=role
     )
-    logger.info(f"Role assigned to user: {email}, role: {default_role}, project_id: {project.id}")
+    logger.info(f"Role assigned to user: {email}, role: {role}, project_id: {project.id}")
 
     return user
 
