@@ -1,6 +1,5 @@
 import os
 import logging
-import re
 from django.db import transaction as tx
 from django.apps import apps
 from django.conf import settings
@@ -18,14 +17,12 @@ PROJECTS = settings.PROJECTS
 DEFAULT_ROLE = settings.DEFAULT_ROLE
 
 def determine_role_and_project(groups):
-    role_project_pattern = re.compile(r'^(.*):(.*)$')
     for group in groups:
-        match = role_project_pattern.match(group)
-        if match:
-            role = match.group(1).upper()
-            project = match.group(2).upper()
-            if project in PROJECTS:
-                return role, PROJECTS[project]
+        parts = group.split(':')
+        if len(parts) == 2:
+            role, project = parts
+            if project.upper() in PROJECTS:
+                return role.upper(), PROJECTS[project.upper()]
     return None, None
 
 @tx.atomic
