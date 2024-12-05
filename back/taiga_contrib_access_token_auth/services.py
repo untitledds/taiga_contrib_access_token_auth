@@ -1,5 +1,6 @@
 import os
 import logging
+import requests
 from django.db import transaction as tx
 from django.apps import apps
 from django.conf import settings
@@ -15,7 +16,68 @@ USER_KEY = settings.ACCESS_TOKEN_USER_KEY
 FILTER_GROUPS = settings.FILTER_GROUPS
 PROJECTS = settings.PROJECTS
 DEFAULT_ROLE = settings.DEFAULT_ROLE
-ADMIN_GROUP = settings.ADMIN_GROUP  # Добавляем переменную окружения для группы администраторов
+ADMIN_GROUP = settings.ADMIN_GROUP
+OIDC_ISSUER_URL = settings.OIDC_ISSUER_URL
+OIDC_CLIENT_ID = settings.OIDC_CLIENT_ID
+OIDC_CLIENT_SECRET = settings.OIDC_CLIENT_SECRET
+OIDC_TOKEN_ENDPOINT = f"{OIDC_ISSUER_URL}/token"
+OIDC_USERINFO_ENDPOINT = f"{OIDC_ISSUER_URL}/userinfo"
+
+def get_oidc_configuration():
+    """
+    Получает конфигурацию OIDC сервера.
+    """
+    discovery_doc_url = f"{OIDC_ISSUER_URL}/.well-known/openid-configuration"
+    try:
+        r = requests.get(discovery_doc_url, timeout=2)
+        config = r.json()
+    except Exception as e:
+        raise ConnectorBaseException(f"Could not get OpenID configuration from well known URL: {str(e)}")
+
+    if 'issuer' not in config:
+        error = config.get('error') or config.get('message') or config
+        raise ConnectorBaseException(f"OpenID Connect issuer response invalid: {error}")
+
+    if config['issuer'] != OIDC_ISSUER_URL:
+        raise ConnectorBaseException("Issuer Claim does not match Issuer URL used to retrieve OpenID configuration")
+
+    return config
+
+def exchange_code_for_tokens(code, redirect_uri):
+    """
+    Обменивает код авторизации на токены доступа и идентификации.
+    """
+    data = {
+        'grant_type': 'authorization_code',
+        'code': code,
+        'redirect_uri': redirect_uri,
+        'client_id': OIDC_CLIENT_ID,
+        'client_secret': OIDC_CLIENT_SECRET,
+    }
+    try:
+        r = requests.post(OIDC_TOKEN_ENDPOINT, data=data)
+        token = r.json()
+    except Exception as e:
+        raise ConnectorBaseException(f"Error exchanging code for tokens: {str(e)}")
+
+    if 'error' in token:
+        error_text = token.get('error_description') or token['error']
+        raise ConnectorBaseException(error_text)
+
+    return token
+
+def get_user_info_from_token(access_token):
+    """
+    Получает информацию о пользователе с использованием токена доступа.
+    """
+    headers = {'Authorization': f"Bearer {access_token}"}
+    try:
+        r = requests.get(OIDC_USERINFO_ENDPOINT, headers=headers)
+        user_info = r.json()
+    except Exception as e:
+        raise ConnectorBaseException(f"Error fetching user info: {str(e)}")
+
+    return user_info
 
 def determine_role_and_project(groups):
     """
@@ -59,7 +121,7 @@ def access_token_register(
     auth_data_model = apps.get_model("users", "AuthData")
     user_model = apps.get_model("users", "User")
     membership_model = apps.get_model("projects", "Membership")
-    role_model = apps.get_model("users", "Role")  # Исправлено: указываем правильное приложение
+    role_model = apps.get_model("users", "Role")
     project_model = apps.get_model("projects", "Project")
 
     try:
@@ -114,8 +176,15 @@ def access_token_register(
 
 def access_token_login_func(request):
     try:
-        access_token = request.POST['access_token']
-        user_info = get_user_info(access_token)
+        code = request.GET.get('code')
+        redirect_uri = request.build_absolute_uri(request.path)
+
+        # Обмен кода авторизации на токены доступа и идентификации
+        token = exchange_code_for_tokens(code, redirect_uri)
+        access_token = token['access_token']
+
+        # Получение информации о пользователе с использованием токена доступа
+        user_info = get_user_info_from_token(access_token)
         groups = user_info.get('groups', [])
 
         user = access_token_register(
